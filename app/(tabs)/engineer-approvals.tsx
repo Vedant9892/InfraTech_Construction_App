@@ -24,7 +24,7 @@ export default function EngineerApprovalScreen() {
     const [pendingAttendances, setPendingAttendances] = useState<PendingAttendance[]>([
         {
             id: '1',
-            labourName: 'Rajesh Kumar',
+            labourName: 'Chetan',
             labourId: 'LAB001',
             photoUri: 'https://via.placeholder.com/400x500',
             location: {

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AttendanceCamera from '../../components/AttendanceCamera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AttendanceRecord {
     id: string;
@@ -12,42 +13,93 @@ interface AttendanceRecord {
         address?: string;
     };
     timestamp: string;
-    status: 'pending' | 'approved' | 'rejected';
+    markedAt: string;
+    status: 'pending' | 'approved' | 'rejected' | 'syncing';
+    labourName: string;
 }
+
+const STORAGE_KEY = '@attendance_simple';
 
 export default function LabourAttendanceScreen() {
     const [showCamera, setShowCamera] = useState(false);
     const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const currentLabourName = 'Chetan';
+
+    useEffect(() => {
+        loadAttendance();
+    }, []);
+
+    const loadAttendance = async () => {
+        try {
+            const stored = await AsyncStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const records = JSON.parse(stored);
+                console.log('📂 Loaded', records.length, 'records from storage');
+                setAttendanceHistory(records);
+            } else {
+                console.log('📂 No stored records found');
+            }
+        } catch (error) {
+            console.error('❌ Error loading attendance:', error);
+        }
+    };
+
+    const saveAttendance = async (records: AttendanceRecord[]) => {
+        try {
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            console.log('💾 Saved', records.length, 'records to storage');
+        } catch (error) {
+            console.error('❌ Error saving attendance:', error);
+        }
+    };
+
     const handlePhotoTaken = async (photo: any) => {
         setIsSubmitting(true);
 
         try {
-            // Here you would upload the photo to your backend
-            // For now, we'll simulate the API call
+            console.log('📸 Photo captured!');
+            console.log('📍 Photo URI:', photo.uri);
+            console.log('📍 Location:', photo.location);
+
+            // Create new attendance record
             const newRecord: AttendanceRecord = {
-                id: Date.now().toString(),
+                id: `ATT_${Date.now()}`,
                 photoUri: photo.uri,
                 location: photo.location,
                 timestamp: photo.timestamp,
+                markedAt: new Date().toISOString(),
                 status: 'pending',
+                labourName: currentLabourName,
             };
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            console.log('✅ Created record:', newRecord.id);
 
-            setAttendanceHistory(prev => [newRecord, ...prev]);
+            // Add to state immediately
+            const updatedRecords = [newRecord, ...attendanceHistory];
+            setAttendanceHistory(updatedRecords);
+
+            // Save to AsyncStorage
+            await saveAttendance(updatedRecords);
+
+            console.log('✅ Record added to history. Total records:', updatedRecords.length);
+
             setShowCamera(false);
 
+            // Show success message
             Alert.alert(
-                'Success',
-                'Attendance marked successfully! Waiting for engineer approval.',
+                '✅ Attendance Marked!',
+                `Photo: Saved\n` +
+                `Location: ${photo.location.address || 'GPS coordinates captured'}\n` +
+                `Time: ${new Date().toLocaleString()}\n\n` +
+                `Status: Pending approval`,
                 [{ text: 'OK' }]
             );
+
         } catch (error) {
-            Alert.alert('Error', 'Failed to submit attendance. Please try again.');
-            console.error('Error submitting attendance:', error);
+            console.error('❌ Error saving attendance:', error);
+            Alert.alert('Error', 'Failed to save attendance. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -149,7 +201,7 @@ export default function LabourAttendanceScreen() {
                                             <Ionicons name="location-outline" size={16} color="#6B7280" />
                                             <Text style={styles.recordDetailText} numberOfLines={1}>
                                                 {record.location.address ||
-                                                    `${record.location.latitude.toFixed(4)}, ${record.location.longitude.toFixed(4)}`}
+                                                    `${record.location.latitude.toFixed(4)}, ${record.location.longitude.toFixed(4)} `}
                                             </Text>
                                         </View>
                                     </View>
